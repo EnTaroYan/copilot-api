@@ -54,6 +54,7 @@ export const createResponses = async (payload: ResponsesPayload) => {
 
 function hasVisionContent(payload: ResponsesPayload): boolean {
   if (typeof payload.input === "string") return false
+  if (!Array.isArray(payload.input)) return false
 
   return payload.input.some((item) => {
     if (Array.isArray(item.content)) {
@@ -65,6 +66,7 @@ function hasVisionContent(payload: ResponsesPayload): boolean {
 
 function hasAgentMessages(payload: ResponsesPayload): boolean {
   if (typeof payload.input === "string") return false
+  if (!Array.isArray(payload.input)) return false
 
   return payload.input.some((item) => {
     if (item.role === "assistant") return true

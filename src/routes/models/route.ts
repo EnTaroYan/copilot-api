@@ -6,6 +6,17 @@ import { cacheModels } from "~/lib/utils"
 
 export const modelRoutes = new Hono()
 
+modelRoutes.get("/all", async (c) => {
+  try {
+    if (!state.models) {
+      await cacheModels()
+    }
+    return c.json(state.models ?? { object: "list", data: [] })
+  } catch (error) {
+    return await forwardError(c, error)
+  }
+})
+
 modelRoutes.get("/", async (c) => {
   try {
     if (!state.models) {
