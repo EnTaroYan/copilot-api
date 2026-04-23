@@ -26,8 +26,10 @@ type ResponseInputItem = {
 export const createResponses = async (payload: ResponsesPayload) => {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
-  const enableVision = hasVisionContent(payload)
-  const isAgentCall = hasAgentMessages(payload)
+  const sanitized = stripUnsupportedTools(payload)
+
+  const enableVision = hasVisionContent(sanitized)
+  const isAgentCall = hasAgentMessages(sanitized)
 
   const headers: Record<string, string> = {
     ...copilotHeaders(state, enableVision),
@@ -37,7 +39,7 @@ export const createResponses = async (payload: ResponsesPayload) => {
   const response = await fetch(`${copilotBaseUrl(state)}/responses`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(sanitized),
   })
 
   if (!response.ok) {
@@ -45,11 +47,40 @@ export const createResponses = async (payload: ResponsesPayload) => {
     throw new HTTPError("Failed to create responses", response)
   }
 
-  if (payload.stream) {
+  if (sanitized.stream) {
     return events(response)
   }
 
   return (await response.json()) as Record<string, unknown>
+}
+
+// Tools that Codex/clients send but Copilot's responses API does not accept.
+// Silently drop them so startup validation on the client side succeeds while
+// upstream doesn't reject the request with 400.
+const UNSUPPORTED_TOOL_TYPES = new Set(["image_generation"])
+
+function stripUnsupportedTools(payload: ResponsesPayload): ResponsesPayload {
+  const tools = payload.tools
+  if (!Array.isArray(tools) || tools.length === 0) return payload
+
+  const filtered = tools.filter((t) => {
+    const type = (t as { type?: string } | null)?.type
+    if (type && UNSUPPORTED_TOOL_TYPES.has(type)) {
+      consola.debug(
+        `Stripping unsupported tool from responses payload: ${type}`,
+      )
+      return false
+    }
+    return true
+  })
+
+  if (filtered.length === tools.length) return payload
+
+  const next: ResponsesPayload = { ...payload, tools: filtered }
+  // If filtering leaves no tools at all, drop the field entirely to avoid
+  // sending an empty array (some upstreams dislike it).
+  if (filtered.length === 0) delete (next as Record<string, unknown>).tools
+  return next
 }
 
 function hasVisionContent(payload: ResponsesPayload): boolean {
