@@ -6,6 +6,7 @@ import { streamSSE } from "hono/streaming"
 import { awaitApproval } from "~/lib/approval"
 import { checkRateLimit } from "~/lib/rate-limit"
 import { state } from "~/lib/state"
+import { translateModelName } from "~/lib/translate-model"
 import { isNullish } from "~/lib/utils"
 import {
   createResponses,
@@ -20,6 +21,10 @@ export async function handleResponses(c: Context) {
     "Responses API request payload:",
     JSON.stringify(payload).slice(-400),
   )
+
+  // Normalize model name (e.g. `claude-opus-4-6` → `claude-opus-4`) so that
+  // downstream lookups and the upstream call all use a supported id.
+  payload.model = translateModelName(payload.model)
 
   // Set default max_output_tokens from model capabilities
   const selectedModel = state.models?.data.find(

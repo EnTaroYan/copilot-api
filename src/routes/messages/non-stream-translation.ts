@@ -1,3 +1,4 @@
+import { translateModelName } from "~/lib/translate-model"
 import {
   type ChatCompletionResponse,
   type ChatCompletionsPayload,
@@ -44,16 +45,6 @@ export function translateToOpenAI(
     tools: translateAnthropicToolsToOpenAI(payload.tools),
     tool_choice: translateAnthropicToolChoiceToOpenAI(payload.tool_choice),
   }
-}
-
-function translateModelName(model: string): string {
-  // Subagent requests use a specific model number which Copilot doesn't support
-  if (model.startsWith("claude-sonnet-4-")) {
-    return model.replace(/^claude-sonnet-4-.*/, "claude-sonnet-4")
-  } else if (model.startsWith("claude-opus-")) {
-    return model.replace(/^claude-opus-4-.*/, "claude-opus-4")
-  }
-  return model
 }
 
 function translateAnthropicMessagesToOpenAI(

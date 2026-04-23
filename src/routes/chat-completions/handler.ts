@@ -7,6 +7,7 @@ import { awaitApproval } from "~/lib/approval"
 import { checkRateLimit } from "~/lib/rate-limit"
 import { state } from "~/lib/state"
 import { getTokenCount } from "~/lib/tokenizer"
+import { translateModelName } from "~/lib/translate-model"
 import { isNullish } from "~/lib/utils"
 import {
   createChatCompletions,
@@ -19,6 +20,10 @@ export async function handleCompletion(c: Context) {
 
   let payload = await c.req.json<ChatCompletionsPayload>()
   consola.debug("Request payload:", JSON.stringify(payload).slice(-400))
+
+  // Normalize model name (e.g. `claude-opus-4-6` → `claude-opus-4`) so that
+  // downstream lookups and the upstream call all use a supported id.
+  payload = { ...payload, model: translateModelName(payload.model) }
 
   // Find the selected model
   const selectedModel = state.models?.data.find(
