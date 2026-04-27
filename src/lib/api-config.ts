@@ -14,7 +14,7 @@ const editorPluginVersion = (state: State) =>
   `copilot-chat/${copilotVersion(state)}`
 const userAgent = (state: State) => `GitHubCopilotChat/${copilotVersion(state)}`
 
-const API_VERSION = "2025-04-01"
+const API_VERSION = "2025-10-01"
 
 export const copilotBaseUrl = (state: State) =>
   state.accountType === "individual" ?
