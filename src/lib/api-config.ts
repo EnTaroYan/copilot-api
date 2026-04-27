@@ -7,9 +7,12 @@ export const standardHeaders = () => ({
   accept: "application/json",
 })
 
-const COPILOT_VERSION = "0.26.7"
-const EDITOR_PLUGIN_VERSION = `copilot-chat/${COPILOT_VERSION}`
-const USER_AGENT = `GitHubCopilotChat/${COPILOT_VERSION}`
+const COPILOT_VERSION_FALLBACK = "0.45.1"
+const copilotVersion = (state: State) =>
+  state.copilotChatVersion ?? COPILOT_VERSION_FALLBACK
+const editorPluginVersion = (state: State) =>
+  `copilot-chat/${copilotVersion(state)}`
+const userAgent = (state: State) => `GitHubCopilotChat/${copilotVersion(state)}`
 
 const API_VERSION = "2025-04-01"
 
@@ -23,8 +26,8 @@ export const copilotHeaders = (state: State, vision: boolean = false) => {
     "content-type": standardHeaders()["content-type"],
     "copilot-integration-id": "vscode-chat",
     "editor-version": `vscode/${state.vsCodeVersion}`,
-    "editor-plugin-version": EDITOR_PLUGIN_VERSION,
-    "user-agent": USER_AGENT,
+    "editor-plugin-version": editorPluginVersion(state),
+    "user-agent": userAgent(state),
     "openai-intent": "conversation-panel",
     "x-github-api-version": API_VERSION,
     "x-request-id": randomUUID(),
@@ -41,8 +44,8 @@ export const githubHeaders = (state: State) => ({
   ...standardHeaders(),
   authorization: `token ${state.githubToken}`,
   "editor-version": `vscode/${state.vsCodeVersion}`,
-  "editor-plugin-version": EDITOR_PLUGIN_VERSION,
-  "user-agent": USER_AGENT,
+  "editor-plugin-version": editorPluginVersion(state),
+  "user-agent": userAgent(state),
   "x-github-api-version": API_VERSION,
   "x-vscode-user-agent-library-version": "electron-fetch",
 })

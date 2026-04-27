@@ -7,6 +7,7 @@ export interface State {
   accountType: string
   models?: ModelsResponse
   vsCodeVersion?: string
+  copilotChatVersion?: string
 
   manualApprove: boolean
   rateLimitWait: boolean

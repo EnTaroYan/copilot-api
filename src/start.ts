@@ -11,7 +11,11 @@ import { initProxyFromEnv } from "./lib/proxy"
 import { generateEnvScript } from "./lib/shell"
 import { state } from "./lib/state"
 import { setupCopilotToken, setupGitHubToken } from "./lib/token"
-import { cacheModels, cacheVSCodeVersion } from "./lib/utils"
+import {
+  cacheCopilotChatVersion,
+  cacheModels,
+  cacheVSCodeVersion,
+} from "./lib/utils"
 import { server } from "./server"
 
 interface RunServerOptions {
@@ -48,7 +52,7 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   state.showToken = options.showToken
 
   await ensurePaths()
-  await cacheVSCodeVersion()
+  await Promise.all([cacheVSCodeVersion(), cacheCopilotChatVersion()])
 
   if (options.githubToken) {
     state.githubToken = options.githubToken
