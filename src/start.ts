@@ -18,6 +18,15 @@ import {
 } from "./lib/utils"
 import { server } from "./server"
 
+const formatModelMultiplier = (model: {
+  billing?: { multiplier?: number }
+}): string => {
+  const m = model.billing?.multiplier
+  if (m === undefined) return ""
+  if (m === 0) return " (free)"
+  return ` (${m}x)`
+}
+
 interface RunServerOptions {
   port: number
   verbose: boolean
@@ -65,7 +74,9 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   await cacheModels()
 
   consola.info(
-    `Available models: \n${state.models?.data.map((model) => `- ${model.id}`).join("\n")}`,
+    `Available models: \n${state.models?.data
+      .map((model) => `- ${model.id}${formatModelMultiplier(model)}`)
+      .join("\n")}`,
   )
 
   const serverUrl = `http://localhost:${options.port}`

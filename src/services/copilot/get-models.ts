@@ -39,6 +39,12 @@ interface ModelCapabilities {
   type: string
 }
 
+export interface ModelBilling {
+  is_premium?: boolean
+  multiplier?: number
+  restricted_to?: Array<string>
+}
+
 export interface Model {
   capabilities: ModelCapabilities
   id: string
@@ -59,4 +65,11 @@ export interface Model {
    */
   supported_endpoints?: Array<string>
   model_picker_category?: string
+  /**
+   * Premium-request billing metadata. Returned when `X-GitHub-Api-Version`
+   * is `2025-05-01` or newer. `multiplier` is the per-request cost in
+   * "premium request" units (e.g. 0 = free, 1 = 1×, 7.5 = 7.5×). May be
+   * absent on older API versions or for non-billable models.
+   */
+  billing?: ModelBilling
 }
