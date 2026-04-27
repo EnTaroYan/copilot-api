@@ -34,14 +34,31 @@ import type {
 
 // --- Detection ------------------------------------------------------------
 
-/** Models known up-front to require the /responses endpoint. */
+/**
+ * Fallback static set: models we know require /responses upstream when the
+ * `/models` endpoint hasn't been fetched yet (or omits supported_endpoints
+ * for that model). The authoritative source is `supported_endpoints` on the
+ * upstream model object — see {@link isResponsesOnlyModel}.
+ */
 const STATIC_RESPONSES_ONLY_MODELS = new Set<string>(["gpt-5.5", "gpt-5-pro"])
 
-/** Runtime cache populated by adaptive fallback. */
+/** Runtime cache populated by adaptive fallback after upstream rejection. */
 const learnedResponsesOnlyModels = new Set<string>()
 
 export function isResponsesOnlyModel(model: string): boolean {
   const id = model.toLowerCase()
+
+  // Authoritative: consult the live model list when available.
+  const upstream = state.models?.data.find((m) => m.id.toLowerCase() === id)
+  const endpoints = upstream?.supported_endpoints
+  if (endpoints && endpoints.length > 0) {
+    const supportsChat = endpoints.includes("/chat/completions")
+    const supportsResponses = endpoints.includes("/responses")
+    if (supportsResponses && !supportsChat) return true
+    if (supportsChat) return false
+    // Falls through to static/learned if neither matches (unexpected shape).
+  }
+
   return (
     STATIC_RESPONSES_ONLY_MODELS.has(id) || learnedResponsesOnlyModels.has(id)
   )

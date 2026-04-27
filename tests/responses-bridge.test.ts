@@ -1,7 +1,9 @@
 import { test, expect } from "bun:test"
 
 import type { ChatCompletionsPayload } from "../src/services/copilot/create-chat-completions"
+import type { Model } from "../src/services/copilot/get-models"
 
+import { state } from "../src/lib/state"
 import {
   chatCompletionsToResponsesPayload,
   isResponsesOnlyModel,
@@ -10,12 +12,58 @@ import {
   responsesEventsToChatChunks,
 } from "../src/services/copilot/responses-bridge"
 
+function makeModel(id: string, supported_endpoints?: Array<string>): Model {
+  return {
+    id,
+    name: id,
+    object: "model",
+    vendor: "test",
+    version: "1",
+    preview: false,
+    model_picker_enabled: true,
+    capabilities: {
+      family: id,
+      object: "model_capabilities",
+      supports: {},
+      tokenizer: "cl100k_base",
+      type: "chat",
+      limits: {},
+    },
+    ...(supported_endpoints ? { supported_endpoints } : {}),
+  }
+}
+
 test("isResponsesOnlyModel matches static gpt-5.5 / gpt-5-pro", () => {
   expect(isResponsesOnlyModel("gpt-5.5")).toBe(true)
   expect(isResponsesOnlyModel("GPT-5.5")).toBe(true)
   expect(isResponsesOnlyModel("gpt-5-pro")).toBe(true)
   expect(isResponsesOnlyModel("gpt-5")).toBe(false)
   expect(isResponsesOnlyModel("gpt-4o")).toBe(false)
+})
+
+test("isResponsesOnlyModel uses upstream supported_endpoints when available", () => {
+  const previous = state.models
+  state.models = {
+    object: "list",
+    data: [
+      makeModel("future-responses-only", ["/responses"]),
+      makeModel("future-chat-only", ["/chat/completions"]),
+      makeModel("future-both", ["/chat/completions", "/responses"]),
+      // gpt-5.5 with explicit chat support should override the static set.
+      makeModel("gpt-5.5", ["/chat/completions"]),
+    ],
+  }
+  try {
+    expect(isResponsesOnlyModel("future-responses-only")).toBe(true)
+    expect(isResponsesOnlyModel("future-chat-only")).toBe(false)
+    expect(isResponsesOnlyModel("future-both")).toBe(false)
+    // Upstream signal beats the static fallback set.
+    expect(isResponsesOnlyModel("gpt-5.5")).toBe(false)
+    // Model not in upstream list still falls back to static set.
+    expect(isResponsesOnlyModel("gpt-5-pro")).toBe(true)
+  } finally {
+    state.models = previous
+  }
 })
 
 test("rememberResponsesOnlyModel adds to runtime cache", () => {

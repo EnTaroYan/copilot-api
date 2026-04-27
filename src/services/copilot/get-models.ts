@@ -52,4 +52,11 @@ export interface Model {
     state: string
     terms: string
   }
+  /**
+   * Set of upstream API endpoints this model is accessible via, e.g.
+   * `["/chat/completions"]` or `["/responses"]`. Present on a subset of
+   * models in the upstream `/models` response (~half as of 2026-04).
+   */
+  supported_endpoints?: Array<string>
+  model_picker_category?: string
 }
