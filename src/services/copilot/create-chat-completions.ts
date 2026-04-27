@@ -1,9 +1,20 @@
 import consola from "consola"
 import { events } from "fetch-event-stream"
 
-import { copilotHeaders, copilotBaseUrl } from "~/lib/api-config"
+import {
+  copilotHeaders,
+  copilotBaseUrl,
+  clampUserField,
+} from "~/lib/api-config"
 import { HTTPError } from "~/lib/error"
 import { state } from "~/lib/state"
+
+import {
+  createChatCompletionsViaResponses,
+  isResponsesOnlyModel,
+  isUnsupportedApiForModelError,
+  rememberResponsesOnlyModel,
+} from "./responses-bridge"
 
 export const createChatCompletions = async (
   payload: ChatCompletionsPayload,
@@ -28,13 +39,36 @@ export const createChatCompletions = async (
     "X-Initiator": isAgentCall ? "agent" : "user",
   }
 
+  // Some models (e.g. gpt-5.5, gpt-5-pro) only work via /responses upstream.
+  // Route those through the bridge so callers see ChatCompletions semantics.
+  if (isResponsesOnlyModel(payload.model)) {
+    return createChatCompletionsViaResponses(payload, headers)
+  }
+
+  const upstreamPayload = clampUserField(adaptPayloadForModel(payload))
+
   const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(upstreamPayload),
   })
 
   if (!response.ok) {
+    // Adaptive fallback: if upstream rejects this model on /chat/completions,
+    // remember it and retry through the responses bridge. Use clone() so the
+    // original Response stays intact for HTTPError if detection fails.
+    if (
+      response.status === 400
+      && (await isUnsupportedApiForModelError(response.clone()))
+    ) {
+      consola.warn(
+        `Model "${payload.model}" not accessible via /chat/completions; `
+          + `routing through /responses bridge.`,
+      )
+      rememberResponsesOnlyModel(payload.model)
+      return createChatCompletionsViaResponses(payload, headers)
+    }
+
     consola.error("Failed to create chat completions", response)
     throw new HTTPError("Failed to create chat completions", response)
   }
@@ -44,6 +78,42 @@ export const createChatCompletions = async (
   }
 
   return (await response.json()) as ChatCompletionResponse
+}
+
+/**
+ * Some upstream models (GPT-5 family, o1/o3/o4 reasoning series, gpt-5-codex,
+ * etc.) reject the legacy `max_tokens` field with:
+ *   "Unsupported parameter: 'max_tokens' is not supported with this model.
+ *    Use 'max_completion_tokens' instead."
+ *
+ * Clients (Claude Code via /v1/messages, OpenAI SDKs, etc.) still send
+ * `max_tokens`, so we rename it on the way out for those models. We also drop
+ * `temperature`/`top_p` when the upstream rejects them on reasoning models —
+ * but only when they equal the defaults, to avoid silently changing behavior.
+ */
+function adaptPayloadForModel(payload: ChatCompletionsPayload):
+  | ChatCompletionsPayload
+  | (Omit<ChatCompletionsPayload, "max_tokens"> & {
+      max_completion_tokens?: number | null
+    }) {
+  if (!modelRequiresMaxCompletionTokens(payload.model)) {
+    return payload
+  }
+
+  const { max_tokens, ...rest } = payload
+  if (max_tokens === undefined || max_tokens === null) {
+    return rest
+  }
+  return { ...rest, max_completion_tokens: max_tokens }
+}
+
+function modelRequiresMaxCompletionTokens(model: string): boolean {
+  const id = model.toLowerCase()
+  // GPT-5 family (incl. gpt-5-codex, gpt-5-mini, gpt-5.x)
+  if (id.startsWith("gpt-5")) return true
+  // OpenAI reasoning model series: o1, o3, o4 (e.g. o1-mini, o3-mini, o4-mini)
+  if (/^o[134](?:[-.]|$)/.test(id)) return true
+  return false
 }
 
 // Streaming types

@@ -1,7 +1,11 @@
 import consola from "consola"
 import { events } from "fetch-event-stream"
 
-import { copilotHeaders, copilotBaseUrl } from "~/lib/api-config"
+import {
+  copilotHeaders,
+  copilotBaseUrl,
+  clampUserField,
+} from "~/lib/api-config"
 import { HTTPError } from "~/lib/error"
 import { state } from "~/lib/state"
 
@@ -26,7 +30,7 @@ type ResponseInputItem = {
 export const createResponses = async (payload: ResponsesPayload) => {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
-  const sanitized = stripUnsupportedTools(payload)
+  const sanitized = clampUserField(stripUnsupportedTools(payload))
 
   const enableVision = hasVisionContent(sanitized)
   const isAgentCall = hasAgentMessages(sanitized)
