@@ -32,6 +32,8 @@ modelRoutes.get("/", async (c) => {
       created_at: new Date(0).toISOString(), // No date available from source
       owned_by: model.vendor,
       display_name: model.name,
+      multiplier: model.billing?.multiplier,
+      is_premium: model.billing?.is_premium,
     }))
 
     return c.json({
