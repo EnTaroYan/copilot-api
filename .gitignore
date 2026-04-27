@@ -12,3 +12,8 @@ node_modules/
 
 # build output
 dist/
+
+# local runtime helpers
+.copilot-api.pid
+start_copilot_api.sh
+stop_copilot_api.sh
