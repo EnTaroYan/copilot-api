@@ -151,18 +151,24 @@ Copilot API now uses a subcommand structure with these main commands:
 
 The following command line options are available for the `start` command:
 
-| Option         | Description                                                                   | Default    | Alias |
-| -------------- | ----------------------------------------------------------------------------- | ---------- | ----- |
-| --port         | Port to listen on                                                             | 4141       | -p    |
-| --verbose      | Enable verbose logging                                                        | false      | -v    |
-| --account-type | Account type to use (individual, business, enterprise)                        | individual | -a    |
-| --manual       | Enable manual request approval                                                | false      | none  |
-| --rate-limit   | Rate limit in seconds between requests                                        | none       | -r    |
-| --wait         | Wait instead of error when rate limit is hit                                  | false      | -w    |
-| --github-token | Provide GitHub token directly (must be generated using the `auth` subcommand) | none       | -g    |
-| --claude-code  | Generate a command to launch Claude Code with Copilot API config              | false      | -c    |
-| --show-token   | Show GitHub and Copilot tokens on fetch and refresh                           | false      | none  |
-| --proxy-env    | Initialize proxy from environment variables                                   | false      | none  |
+| Option             | Description                                                                                                                                | Default      | Alias |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ----- |
+| --port             | Port to listen on                                                                                                                          | 4141         | -p    |
+| --verbose          | Enable verbose logging                                                                                                                     | false        | -v    |
+| --account-type     | Account type to use (individual, business, enterprise). Usually unnecessary — when the upstream token carries an explicit endpoint we use that instead. | individual   | -a    |
+| --home             | Override `$HOME` for token / lockfile storage. Use a different value per instance to run a multi-account pool against the same machine.    | `$HOME`      | none  |
+| --github-base-url  | GitHub base URL for OAuth + REST. Set to your GHE/GHEC tenant (e.g. `https://acme.ghe.com`) to authenticate against an enterprise account. | `https://github.com` | none  |
+| --force            | Bypass the per-`--home` instance lock check (use only if a previous PID was killed uncleanly).                                              | false        | none  |
+| --manual           | Enable manual request approval                                                                                                             | false        | none  |
+| --rate-limit       | Rate limit in seconds between requests                                                                                                     | none         | -r    |
+| --wait             | Wait instead of error when rate limit is hit                                                                                               | false        | -w    |
+| --github-token     | Provide GitHub token directly (must be generated using the `auth` subcommand)                                                              | none         | -g    |
+| --claude-code      | Generate a command to launch Claude Code with Copilot API config                                                                           | false        | -c    |
+| --show-token       | Show GitHub and Copilot tokens on fetch and refresh                                                                                        | false        | none  |
+| --proxy-env        | Initialize proxy from environment variables                                                                                                | false        | none  |
+
+Each option also has an environment variable equivalent for `--home`
+(`COPILOT_API_HOME`) and `--github-base-url` (`COPILOT_API_GITHUB_BASE_URL`).
 
 ### Auth Command Options
 
@@ -256,6 +262,38 @@ npx copilot-api@latest debug --json
 # Initialize proxy from environment variables (HTTP_PROXY, HTTPS_PROXY, etc.)
 npx copilot-api@latest start --proxy-env
 ```
+
+## Multi-Account Pool / GitHub Enterprise (GHEC)
+
+`copilot-api` writes its OAuth token + a PID lockfile under
+`<home>/.local/share/copilot-api/`. By default `<home>` is `$HOME`, but
+you can pin each instance to its own directory with `--home`, which is
+how you run several accounts against the same machine without them
+clobbering each other's tokens. The `instance.lock` file holds the
+running PID, and a second `start` against the same `--home` will refuse
+to launch.
+
+For GitHub Enterprise (GHEC) tenants, also pass `--github-base-url` —
+the device-flow login goes through `<base-url>/login/device` and the
+OAuth API calls go through `api.<host>`. The Copilot upstream endpoint
+is read from the token response (`endpoints.api`), so GHEC tokens whose
+JWT carries a region "stamp" (e.g. `prod-wus3-01`) automatically route
+to the right host without any extra flag.
+
+```sh
+# Public github.com — personal account
+copilot-api start --home /var/copilot-pool/personal --port 4142
+
+# GHEC tenant — same machine, different home + base URL
+copilot-api start \
+  --home /var/copilot-pool/work \
+  --port 4143 \
+  --github-base-url https://acme.ghe.com
+```
+
+First run prompts for device-flow code; subsequent runs reuse the saved
+token. `acme.ghe.com` here is the GHEC tenant subdomain — the OAuth +
+Copilot calls go to `api.acme.ghe.com` automatically.
 
 ## Using the Usage Viewer
 
