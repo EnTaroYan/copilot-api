@@ -30,7 +30,9 @@ type ResponseInputItem = {
 export const createResponses = async (payload: ResponsesPayload) => {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
-  const sanitized = clampUserField(stripUnsupportedTools(payload))
+  const sanitized = clampUserField(
+    stripUnsupportedFields(stripUnsupportedTools(payload)),
+  )
 
   const enableVision = hasVisionContent(sanitized)
   const isAgentCall = hasAgentMessages(sanitized)
@@ -56,6 +58,20 @@ export const createResponses = async (payload: ResponsesPayload) => {
   }
 
   return (await response.json()) as Record<string, unknown>
+}
+
+// Top-level fields that some clients send (per OpenAI Responses spec) but
+// Copilot's upstream rejects with `unsupported_value`. Strip them silently
+// instead of bubbling a 400 back to the caller.
+function stripUnsupportedFields(payload: ResponsesPayload): ResponsesPayload {
+  const { service_tier, ...rest } = payload as ResponsesPayload & {
+    service_tier?: unknown
+  }
+  if (service_tier === undefined && !("service_tier" in payload)) {
+    return payload
+  }
+  consola.debug("Stripping unsupported responses payload field: service_tier")
+  return rest
 }
 
 // Tools that Codex/clients send but Copilot's responses API does not accept.
