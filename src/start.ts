@@ -6,8 +6,9 @@ import consola from "consola"
 import { serve, type ServerHandler } from "srvx"
 import invariant from "tiny-invariant"
 
-import { ensurePaths } from "./lib/paths"
+import { acquireInstanceLock, ensurePaths, refreshPaths } from "./lib/paths"
 import { initProxyFromEnv } from "./lib/proxy"
+import { setRuntimeConfig } from "./lib/runtime-config"
 import { generateEnvScript } from "./lib/shell"
 import { state } from "./lib/state"
 import { setupCopilotToken, setupGitHubToken } from "./lib/token"
@@ -38,6 +39,9 @@ interface RunServerOptions {
   claudeCode: boolean
   showToken: boolean
   proxyEnv: boolean
+  githubBaseUrl?: string
+  home?: string
+  force?: boolean
 }
 
 export async function runServer(options: RunServerOptions): Promise<void> {
@@ -48,6 +52,21 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   if (options.verbose) {
     consola.level = 5
     consola.info("Verbose logging enabled")
+  }
+
+  // Apply runtime overrides BEFORE any path computation or GitHub call so
+  // that token storage and OAuth endpoints both pick up the new home /
+  // GitHub base URL on this very request path.
+  setRuntimeConfig({
+    githubBaseUrl: options.githubBaseUrl,
+    homePath: options.home,
+  })
+  refreshPaths()
+  if (options.githubBaseUrl) {
+    consola.info(`Using GitHub base URL: ${options.githubBaseUrl}`)
+  }
+  if (options.home) {
+    consola.info(`Using copilot-api home: ${options.home}`)
   }
 
   state.accountType = options.accountType
@@ -61,6 +80,7 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   state.showToken = options.showToken
 
   await ensurePaths()
+  await acquireInstanceLock({ force: options.force })
   await Promise.all([cacheVSCodeVersion(), cacheCopilotChatVersion()])
 
   if (options.githubToken) {
@@ -200,6 +220,28 @@ export const start = defineCommand({
       default: false,
       description: "Initialize proxy from environment variables",
     },
+    "github-base-url": {
+      type: "string",
+      description:
+        "Override GitHub base URL for OAuth + REST (default: https://github.com). "
+        + "API base URL is derived by prefixing the host with `api.` so "
+        + "`https://acme.ghe.com` becomes `https://api.acme.ghe.com`. "
+        + "Env: COPILOT_API_GITHUB_BASE_URL",
+    },
+    home: {
+      type: "string",
+      description:
+        "Override the home directory used to derive the on-disk APP_DIR "
+        + "(<home>/.local/share/copilot-api). Use a unique value per pool "
+        + "instance to keep GitHub tokens isolated. Env: COPILOT_API_HOME",
+    },
+    force: {
+      type: "boolean",
+      default: false,
+      description:
+        "Bypass the per-home instance lock check (use only if you know the "
+        + "previous instance is dead but the lockfile wasn't cleaned up).",
+    },
   },
   run({ args }) {
     const rateLimitRaw = args["rate-limit"]
@@ -218,6 +260,11 @@ export const start = defineCommand({
       claudeCode: args["claude-code"],
       showToken: args["show-token"],
       proxyEnv: args["proxy-env"],
+      githubBaseUrl:
+        (args["github-base-url"] as string | undefined)
+        ?? process.env.COPILOT_API_GITHUB_BASE_URL,
+      home: (args.home as string | undefined) ?? process.env.COPILOT_API_HOME,
+      force: args.force,
     })
   },
 })

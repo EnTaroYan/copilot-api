@@ -1,10 +1,7 @@
 import consola from "consola"
 
-import {
-  GITHUB_BASE_URL,
-  GITHUB_CLIENT_ID,
-  standardHeaders,
-} from "~/lib/api-config"
+import { GITHUB_CLIENT_ID, standardHeaders } from "~/lib/api-config"
+import { getGithubBaseUrl } from "~/lib/runtime-config"
 import { sleep } from "~/lib/utils"
 
 import type { DeviceCodeResponse } from "./get-device-code"
@@ -19,7 +16,7 @@ export async function pollAccessToken(
 
   while (true) {
     const response = await fetch(
-      `${GITHUB_BASE_URL}/login/oauth/access_token`,
+      `${getGithubBaseUrl()}/login/oauth/access_token`,
       {
         method: "POST",
         headers: standardHeaders(),
