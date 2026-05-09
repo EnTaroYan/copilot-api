@@ -3,6 +3,13 @@ import type { ModelsResponse } from "~/services/copilot/get-models"
 export interface State {
   githubToken?: string
   copilotToken?: string
+  /**
+   * Upstream Copilot API base URL learned from the token response
+   * (`endpoints.api`). Required for GHEC tokens whose region "stamp" is not
+   * recognized by the public `api.githubcopilot.com` host. Falls back to
+   * account-type derivation when absent.
+   */
+  copilotApiEndpoint?: string
 
   accountType: string
   models?: ModelsResponse
