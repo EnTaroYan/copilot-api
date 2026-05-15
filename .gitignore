@@ -15,8 +15,3 @@ dist/
 
 # local runtime helpers
 .copilot-api.pid
-start_copilot_api.sh
-stop_copilot_api.sh
-start_pool.sh
-stop_pool.sh
-pool.manifest
