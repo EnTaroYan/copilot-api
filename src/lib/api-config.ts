@@ -7,14 +7,14 @@ export const standardHeaders = () => ({
   accept: "application/json",
 })
 
-const COPILOT_VERSION_FALLBACK = "0.45.1"
+const COPILOT_VERSION_FALLBACK = "0.47.0"
 const copilotVersion = (state: State) =>
   state.copilotChatVersion ?? COPILOT_VERSION_FALLBACK
 const editorPluginVersion = (state: State) =>
   `copilot-chat/${copilotVersion(state)}`
 const userAgent = (state: State) => `GitHubCopilotChat/${copilotVersion(state)}`
 
-const API_VERSION = "2025-10-01"
+const API_VERSION = "2026-01-09"
 
 export const copilotBaseUrl = (state: State) => {
   if (state.copilotApiEndpoint) return state.copilotApiEndpoint

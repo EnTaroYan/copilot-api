@@ -1,4 +1,4 @@
-const FALLBACK = "0.45.1"
+const FALLBACK = "0.47.0"
 
 const MARKETPLACE_URL =
   "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery"
