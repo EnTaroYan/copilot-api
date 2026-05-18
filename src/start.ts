@@ -28,6 +28,22 @@ const formatModelMultiplier = (model: {
   return ` (${m}x)`
 }
 
+// Periodic background refresh of the model list. Without this,
+// newly-added upstream models or billing/multiplier changes are only
+// picked up on restart. 2h matches the proxy-side cache TTL.
+const MODELS_REFRESH_INTERVAL_MS = 2 * 60 * 60 * 1000
+
+function scheduleModelsRefresh(): void {
+  const timer = setInterval(() => {
+    void cacheModels().catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e)
+      consola.warn(`Background models refresh failed: ${msg}`)
+    })
+  }, MODELS_REFRESH_INTERVAL_MS)
+  // Don't keep the process alive just for this refresh tick.
+  ;(timer as { unref?: () => void }).unref?.()
+}
+
 interface RunServerOptions {
   port: number
   verbose: boolean
@@ -92,6 +108,7 @@ export async function runServer(options: RunServerOptions): Promise<void> {
 
   await setupCopilotToken()
   await cacheModels()
+  scheduleModelsRefresh()
 
   consola.info(
     `Available models: \n${state.models?.data
